@@ -2743,14 +2743,21 @@ contains
     zeroes_ice=Ice%t_surf*0.0
     do fr = 1,n_fire_tr
        call put_to_xgrid ( zeroes_ice, 'OCN', ex_fire_tr_surf(:,fr), xmap_sfc )
-       call put_to_xgrid ( Land%fire_emis(:,:,fr), 'LND', ex_fire_tr_surf(:,fr), xmap_sfc )
+#ifndef _USE_LEGACY_LAND_
+       call put_to_xgrid_land ( Land%fire_emis(:,:,n),   'LND', ex_fire_tr_surf(:,fr), xmap_sfc )
+#else
+       call put_to_xgrid_land ( Land%fire_emis(:,:,:,n), 'LND', ex_fire_tr_surf(:,fr), xmap_sfc )
+#endif
        call get_from_xgrid ( Land_Ice_Atmos_Boundary%fire_emis(:,:,fr), 'ATM', ex_fire_tr_surf(:,fr), xmap_sfc )
        Land_Ice_Atmos_Boundary%fire_tr_name(fr)=trim(Land%fire_tr_name(fr))
     enddo
     call put_to_xgrid ( zeroes_ice, 'OCN', ex_fire_intensity(:), xmap_sfc )
     !!! dsward_avg  call put_to_xgrid ( Land%fire_intensity(:,:,:), 'LND', ex_fire_intensity(:), xmap_sfc )
-    !call put_to_xgrid ( Land%FRP_max(:), 'LND', ex_fire_intensity(:), xmap_sfc )
-    call get_from_xgrid ( Land_Ice_Atmos_Boundary%fire_intensity(:,:), 'ATM', ex_fire_intensity(:), xmap_sfc )
+#ifndef _USE_LEGACY_LAND_
+    call put_to_xgrid_land ( Land%FRP_max(:,:),   'LND', ex_fire_intensity(:), xmap_sfc )
+#else
+    call put_to_xgrid_land ( Land%FRP_max(:,:,:), 'LND', ex_fire_intensity(:), xmap_sfc )
+#endif
     !!! dsward_cpl end
     !-----------------------------------------------------------------------
     !---- get mean quantites on atmospheric grid ----
