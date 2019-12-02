@@ -2758,6 +2758,7 @@ contains
 #else
     call put_to_xgrid_land ( Land%FRP_max(:,:,:), 'LND', ex_fire_intensity(:), xmap_sfc )
 #endif
+    call get_from_xgrid ( Land_Ice_Atmos_Boundary%fire_intensity(:,:), 'ATM', ex_fire_intensity(:), xmap_sfc )
     !!! dsward_cpl end
     !-----------------------------------------------------------------------
     !---- get mean quantites on atmospheric grid ----
