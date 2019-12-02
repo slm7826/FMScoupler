@@ -37,7 +37,7 @@ module atm_land_ice_flux_exchange_mod
   use   ice_model_mod,    only: ice_data_type, land_ice_boundary_type, ocean_ice_boundary_type
   use   ice_model_mod,    only: atmos_ice_boundary_type, Ice_stock_pe
   use   ice_model_mod,    only: update_ice_atm_deposition_flux
-  use    land_model_mod,  only: land_data_type, atmos_land_boundary_type
+  use    land_model_mod,  only: land_data_type, atmos_land_boundary_type, n_fire_tr, fire_tracer_data
 #ifndef _USE_LEGACY_LAND_
   use    land_model_mod,  only: set_default_diag_filter, register_tiled_diag_field
   use    land_model_mod,  only: send_tile_data, dump_tile_diag_fields
@@ -106,8 +106,7 @@ module atm_land_ice_flux_exchange_mod
   use atmos_ocean_fluxes_mod,  only: atmos_ocean_fluxes_init
   use atmos_ocean_fluxes_calc_mod, only: atmos_ocean_fluxes_calc
   use atmos_ocean_dep_fluxes_calc_mod, only: atmos_ocean_dep_fluxes_calc
-  use vegetation_mod,         only: n_fire_tr  !!! dsward_cpl added
-  
+
 #ifdef SCM
   ! option to override various surface boundary conditions for SCM
   use scm_forc_mod,            only: do_specified_flux, scm_surface_flux,             &
@@ -590,7 +589,7 @@ contains
 
     ! This call sets up a structure that is private to the ice model, and it
     ! does not belong here.  This line should be eliminated once an update
-    ! to the FMS coupler_types code is made available that overloads the 
+    ! to the FMS coupler_types code is made available that overloads the
     ! subroutine coupler_type_copy to use 2d and 3d coupler type sources. -RWH
     if (.not.coupler_type_initialized(Ice%ocean_fluxes_top)) &
       call coupler_type_spawn(ex_gas_fields_ice, Ice%ocean_fluxes_top, (/is,is,ie,ie/), &
@@ -627,6 +626,9 @@ contains
     allocate( land_ice_atmos_boundary%frac_open_sea(is:ie,js:je) )
     allocate( land_ice_atmos_boundary%fire_emis(is:ie,js:je,n_fire_tr) )  !!! dsward_cpl added fire_emis
     allocate( land_ice_atmos_boundary%fire_tr_name(n_fire_tr) )  !!! dsward_cpl added fire_tr_name
+    do i = 1,n_fire_tr
+       land_ice_atmos_boundary%fire_tr_name(i) = fire_tracer_data(i)%name
+    enddo
     allocate( land_ice_atmos_boundary%fire_intensity(is:ie,js:je) )  !!! dsward_cpl added fire_intensity
     ! initialize boundary values for override experiments (mjh)
     land_ice_atmos_boundary%t=273.0
@@ -656,7 +658,7 @@ contains
     land_ice_atmos_boundary%rough_mom=0.01
     land_ice_atmos_boundary%frac_open_sea=0.0
     land_ice_atmos_boundary%fire_emis=0.0   !!! dsward_cpl
-    land_ice_atmos_boundary%fire_intensity=0.0   !!! dsward_cpl    
+    land_ice_atmos_boundary%fire_intensity=0.0   !!! dsward_cpl
 
     ! allocate fields for extra tracers
     ! The first call is no longer necessary, the fluxes will be passed by the land module
@@ -1711,7 +1713,7 @@ contains
        call get_from_xgrid (diag_atm, 'ATM', ex_ref, xmap_sfc)
        used = send_data ( id_rh_ref, diag_atm, Time )
     endif
- 
+
     if(id_rh_ref_cmip > 0 .or. id_hurs > 0 .or. id_rhs > 0) then
        call get_from_xgrid (diag_atm, 'ATM', ex_ref2, xmap_sfc)
        if (id_rh_ref_cmip > 0) used = send_data ( id_rh_ref_cmip, diag_atm, Time )
@@ -2589,7 +2591,7 @@ contains
 
     real, dimension(n_xgrid_sfc,n_fire_tr) :: ex_fire_tr_surf ! dsward_cpl added
     real, dimension(n_xgrid_sfc) :: ex_fire_intensity         ! dsward_cpl added
-    real, dimension(size(Ice%t_surf,1), size(Ice%t_surf,2), size(Ice%t_surf,3)) :: zeroes_ice  !!! dsward_cpl 
+    real, dimension(size(Ice%t_surf,1), size(Ice%t_surf,2), size(Ice%t_surf,3)) :: zeroes_ice  !!! dsward_cpl
     integer :: fr       ! fire tracer index  !!! dsward_cpl
 
     real, dimension(size(Land_Ice_Atmos_Boundary%dt_t,1),size(Land_Ice_Atmos_Boundary%dt_t,2)) :: diag_atm, &
@@ -2744,12 +2746,11 @@ contains
     do fr = 1,n_fire_tr
        call put_to_xgrid ( zeroes_ice, 'OCN', ex_fire_tr_surf(:,fr), xmap_sfc )
 #ifndef _USE_LEGACY_LAND_
-       call put_to_xgrid_land ( Land%fire_emis(:,:,n),   'LND', ex_fire_tr_surf(:,fr), xmap_sfc )
+       call put_to_xgrid_land ( Land%fire_emis(:,:,fr),   'LND', ex_fire_tr_surf(:,fr), xmap_sfc )
 #else
-       call put_to_xgrid_land ( Land%fire_emis(:,:,:,n), 'LND', ex_fire_tr_surf(:,fr), xmap_sfc )
+       call put_to_xgrid_land ( Land%fire_emis(:,:,:,fr), 'LND', ex_fire_tr_surf(:,fr), xmap_sfc )
 #endif
        call get_from_xgrid ( Land_Ice_Atmos_Boundary%fire_emis(:,:,fr), 'ATM', ex_fire_tr_surf(:,fr), xmap_sfc )
-       Land_Ice_Atmos_Boundary%fire_tr_name(fr)=trim(Land%fire_tr_name(fr))
     enddo
     call put_to_xgrid ( zeroes_ice, 'OCN', ex_fire_intensity(:), xmap_sfc )
     !!! dsward_avg  call put_to_xgrid ( Land%fire_intensity(:,:,:), 'LND', ex_fire_intensity(:), xmap_sfc )
