@@ -133,7 +133,7 @@ public  surface_flux, surface_flux_init
 interface surface_flux
 !    module procedure surface_flux_0d
     module procedure surface_flux_1d
-    module procedure surface_flux_2d
+!    module procedure surface_flux_2d
 end interface
 
 
@@ -207,7 +207,11 @@ subroutine surface_flux_1d (                                           &
      thv_atm,   thv_surf,                                              &  ! ZNT 05/03/2020
      dhdt_surf, dedt_surf,  dedq_surf,  drdt_surf,                     &
      dhdt_atm,  dedq_atm,   dtaudu_atm, dtaudv_atm,                    &
-     dt,        land,      seawater,     avail  )
+     dt,        land,      seawater,     avail,                        &
+     rich,      zeta,       phi_m,      phi_t)  ! optional outputs, slm 2021-06-29
+                                                ! it's easier to make them optional rather than
+                                                ! modify every SCM driver which calls surface_flux
+                                                ! and does not need them
   ! ---- arguments -----------------------------------------------------------
   logical, intent(in), dimension(:) :: land, & !< Indicates where land exists (.TRUE. if exchange cell is on land
                                        seawater, & !< Indicates where liquid ocean water exists (.TRUE. if exchange cell is on liquid ocean water)
@@ -249,9 +253,15 @@ subroutine surface_flux_1d (                                           &
                                      thv_surf, &  ! ZNT 05/03/2020
                                      cd_m, & !< Momentum exchange coefficient
                                      cd_t, & ! Heat exchange coefficient
-                                     cd_q !< Moisture exchange coefficient
+                                     cd_q    !< Moisture exchange coefficient
   real, intent(inout), dimension(:) :: q_surf !< Mixing ratio at the Earth's surface (kg/kg)
   real, intent(in) :: dt !< Time step (it is not used presently)
+                                     ! + slm, 2021-06-29, for diag and heterogeneous EDMF
+  real, intent(out), dimension(:), optional :: &
+                                     rich, & !< Richardson number
+                                     zeta, & !< Monin-Obukhov scaling parameteter, z/L
+                                     phi_m, & !< differential stability function for momentum, at z_atm
+                                     phi_t    !< differential stability function for heat, at z_atm
 
   ! ---- local constants -----------------------------------------------------
   ! temperature increment and its reciprocal value for comp. of derivatives
@@ -264,6 +274,8 @@ subroutine surface_flux_1d (                                           &
        t_surf0,  t_surf1,  u_dif,     v_dif,               &
        rho_drag, drag_t,    drag_m,   drag_q,    rho,      &
        q_atm,    q_surf0,  dw_atmdu,  dw_atmdv,  w_gust
+  real, dimension(size(t_atm(:))) ::                          &
+       rich_, zeta_, phi_m_, phi_t_
 
   integer :: i, nbad
 
@@ -364,7 +376,16 @@ subroutine surface_flux_1d (                                           &
   !  monin-obukhov similarity theory
   call mo_drag (thv_atm, thv_surf, z_atm,                  &
        rough_mom, rough_heat, rough_moist, w_atm,          &
-       cd_m, cd_t, cd_q, u_star, b_star, avail             )
+       cd_m, cd_t, cd_q, u_star, b_star,                   &
+       rich_, zeta_, phi_m_, phi_t_,                       &
+       avail                                               )
+  ! + slm 2021-06-29 assign values to optional output; instead, perhaps should make them
+  ! optional in mo_drag?
+  if (present(rich))  rich(:) = rich_(:)
+  if (present(zeta))  zeta(:) = zeta_(:)
+  if (present(phi_m)) phi_m(:) = phi_m_(:)
+  if (present(phi_t)) phi_t(:) = phi_t_(:)
+  ! - slm 2021-06-29
 
   ! override with ocean fluxes from NCAR calculation
   if (ncar_ocean_flux .or. ncar_ocean_flux_orig) then

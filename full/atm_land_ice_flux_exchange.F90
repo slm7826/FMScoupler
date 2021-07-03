@@ -159,7 +159,8 @@ module atm_land_ice_flux_exchange_mod
              id_q_ref,  id_q_ref_land, id_q_flux_land, id_rh_ref_cmip, &
              id_hussLut_land, id_tasLut_land, id_t_flux_land
   integer :: id_t_surf_in, id_t_ca_in, id_q_surf_in, &   ! ZNT 09/03/2020
-             id_q_surf_raw, id_t_atm_in, id_q_atm_in, & 
+             id_zeta, id_rich, id_phi_m, id_phi_t, & ! slm 2021-06-29
+             id_q_surf_raw, id_t_atm_in, id_q_atm_in, &
              id_t_surf_out, id_t_ca_out, id_q_surf_out, id_t_atm_delt, id_q_atm_delt, &
              id_t_flux_first, id_t_flux_second, id_q_flux_first, id_q_flux_second
   integer :: id_co2_atm_dvmr, id_co2_surf_dvmr
@@ -742,7 +743,8 @@ contains
          ex_del_m,      &
          ex_del_h,      &
          ex_del_q,      &
-         ex_frac_open_sea
+         ex_frac_open_sea, &
+         ex_rich, ex_zeta, ex_phi_m, ex_phi_t ! slm 2021-06-29, optional surface_flux outputs for heterogeneous ABL
 
     real, dimension(n_xgrid_sfc,n_exch_tr) :: ex_tr_atm
     ! jgj: added for co2_atm diagnostic
@@ -1162,7 +1164,8 @@ contains
             ex_dhdt_surf(is:ie), ex_dedt_surf(is:ie), ex_dfdtr_surf(is:ie,isphum),  ex_drdt_surf(is:ie),        &
             ex_dhdt_atm(is:ie),  ex_dfdtr_atm(is:ie,isphum),  ex_dtaudu_atm(is:ie), ex_dtaudv_atm(is:ie),       &
             dt,                                                             &
-            ex_land(is:ie), ex_seawater(is:ie) .gt. 0.0,  ex_avail(is:ie)            )
+            ex_land(is:ie), ex_seawater(is:ie) .gt. 0.0,  ex_avail(is:ie),  &
+            ex_rich(is:ie), ex_zeta(is:ie), ex_phi_m(is:ie), ex_phi_t(is:ie) ) ! slm 2021-06-29
     enddo
 
 #ifdef SCM
@@ -1187,6 +1190,24 @@ contains
 
     endif
 #endif
+
+! slm 2021-06-29 send variables needed by heterogeneous ABL to the diagnostics
+    if ( id_rich > 0 ) then
+       call get_from_xgrid (diag_atm, 'ATM', ex_rich, xmap_sfc)
+       used = send_data ( id_rich, diag_atm, Time )
+    endif
+    if ( id_zeta > 0 ) then
+       call get_from_xgrid (diag_atm, 'ATM', ex_zeta, xmap_sfc)
+       used = send_data ( id_zeta, diag_atm, Time )
+    endif
+    if ( id_phi_m > 0 ) then
+       call get_from_xgrid (diag_atm, 'ATM', ex_phi_m, xmap_sfc)
+       used = send_data ( id_phi_m, diag_atm, Time )
+    endif
+    if ( id_phi_t > 0 ) then
+       call get_from_xgrid (diag_atm, 'ATM', ex_phi_t, xmap_sfc)
+       used = send_data ( id_phi_t, diag_atm, Time )
+    endif
 
 ! ZNT 09/03/2020: some diagnoses before implicit update
     if ( id_t_surf_in > 0 ) then
@@ -2556,7 +2577,7 @@ contains
        used = send_data ( id_q_flux_second, diag_atm, Time )
     endif
 ! ZNT 09/03/2020: end of added diagnoses
-    
+
 
     call mpp_clock_end(fluxAtmDnClock)
     call mpp_clock_end(cplClock)
@@ -2768,7 +2789,7 @@ contains
              !     workaround for now: calculate q_surf_new from updated flux.
              ex_delta_tr_n(i,isphum)  = ex_f_tr_delt_n(i,isphum) + ex_dt_t_surf(i) * ex_e_q_n(i)
              ex_flux_tr(i,isphum)     = ex_flux_tr(i,isphum)     + ex_dt_t_surf(i) * ex_dedt_surf(i)
-             ex_tr_surf_new(i,isphum) = ex_tr_surf(i,isphum) + & 
+             ex_tr_surf_new(i,isphum) = ex_tr_surf(i,isphum) + &
                                         ex_dt_t_surf(i) * ex_dedt_surf(i) / (-ex_dfdtr_atm(i,isphum))
           endif
        enddo
@@ -2828,7 +2849,7 @@ contains
     endif
 
 ! ZNT 09/03/2020: end of added diagnoses
-    
+
     !------- new surface temperature -----------
 #ifdef use_AM3_physics
     if ( id_t_surf > 0 ) then
@@ -3449,6 +3470,20 @@ contains
     id_del_q      = &
          register_diag_field ( mod_name, 'del_q',      atmos_axes, Time,     &
          'ref height interp factor for moisture','none' )
+
+! slm 2021-06-29, diagnostics for heterogeneous ABL variables
+    id_zeta = &
+         register_diag_field ( mod_name, 'zeta',       atmos_axes, Time, &
+         'Monin-Obukhov scaling, z/L', 'none' )
+    id_rich = &
+         register_diag_field ( mod_name, 'rich',       atmos_axes, Time, &
+         'bulk Richardson number', 'none' )
+    id_phi_m = &
+         register_diag_field ( mod_name, 'phi_m',      atmos_axes, Time, &
+         'differential stability function for momentum at z_atm', 'none' )
+    id_phi_t = &
+         register_diag_field ( mod_name, 'phi_t',      atmos_axes, Time, &
+         'differential stability function for temperature at z_atm', 'none' )
 
 ! ZNT 09/03/2020: additional output fields
     id_t_surf_in     = &
