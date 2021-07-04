@@ -325,7 +325,7 @@ module atm_land_ice_flux_exchange_mod
       ! as fractions of its standard deviation) for calculations of updraft area fraction
       ! and their vertical velocity
   real :: ct2 = 28.4, cw2 = 1.25, ct3 = 2.9, cw3 = 3.0 ! correlation calculation coefficients
-  namelist /hetero_pbl_nml/ w_min, w_max, &
+  namelist /hetero_edmf_nml/ w_min, w_max, &
       ct2, cw2, ct3, cw3
 
 contains
@@ -386,14 +386,14 @@ contains
 
     if ( file_exist('input.nml')) then
 #ifdef INTERNAL_FILE_NML
-      read(input_nml_file, nml=hetero_pbl_nml, iostat=io)
-      ierr = check_nml_error(io, 'hetero_pbl_nml')
+      read(input_nml_file, nml=hetero_edmf_nml, iostat=io)
+      ierr = check_nml_error(io, 'hetero_edmf_nml')
 #else
       unit = open_namelist_file ( )
       ierr=1
       do while (ierr /= 0)
          read  (unit, nml=atmos_model_nml, iostat=io, end=10)
-         ierr = check_nml_error(io,'hetero_pbl_nml')
+         ierr = check_nml_error(io,'hetero_edmf_nml')
       enddo
  10     call close_file (unit)
 #endif
@@ -655,6 +655,16 @@ contains
     allocate( land_ice_atmos_boundary%thv_surf(is:ie,js:je) )!ZNT
     allocate( land_ice_atmos_boundary%rough_mom(is:ie,js:je) )
     allocate( land_ice_atmos_boundary%frac_open_sea(is:ie,js:je) )
+! + slm for surface heterogeneity effects on PBL
+    allocate( land_ice_atmos_boundary%frac_up (is:ie,js:je) )
+    allocate( land_ice_atmos_boundary%w_up    (is:ie,js:je) )
+    allocate( land_ice_atmos_boundary%t_up    (is:ie,js:je) )
+    allocate( land_ice_atmos_boundary%q_up    (is:ie,js:je) )
+    land_ice_atmos_boundary%frac_up = 0.0
+    land_ice_atmos_boundary%w_up    = 0.0
+    land_ice_atmos_boundary%t_up    = 273.0
+    land_ice_atmos_boundary%q_up    = 0.0
+! - slm
     ! initialize boundary values for override experiments (mjh)
     land_ice_atmos_boundary%t=273.0
     land_ice_atmos_boundary%u_ref=0.0   ! bqx
@@ -1526,15 +1536,18 @@ contains
     elsewhere
        ex_q_up = ex_tr_atm(:,isphum)
     end where
+
+! put the data to atmospheric grid
+    call get_from_xgrid (Land_Ice_Atmos_Boundary%frac_up, 'ATM', ex_frac_up, xmap_sfc, complete=.false. )
+    call get_from_xgrid (Land_Ice_Atmos_Boundary%w_up,    'ATM', ex_w_up,    xmap_sfc, complete=.false. )
+    call get_from_xgrid (Land_Ice_Atmos_Boundary%t_up,    'ATM', ex_t_up,    xmap_sfc, complete=.false. )
+    call get_from_xgrid (Land_Ice_Atmos_Boundary%q_up,    'ATM', ex_q_up,    xmap_sfc, complete=.true. )
+
 ! diagnostics
-    if ( id_frac_up > 0 ) then
-       call get_from_xgrid (diag_atm, 'ATM', ex_frac_up, xmap_sfc)
-       used = send_data ( id_frac_up, diag_atm, Time )
-    endif
-    if ( id_w_up > 0 ) then
-       call get_from_xgrid (diag_atm, 'ATM', ex_w_up, xmap_sfc)
-       used = send_data ( id_w_up, diag_atm, Time )
-    endif
+    if ( id_frac_up > 0 ) used = send_data ( id_frac_up, Land_Ice_Atmos_Boundary%frac_up, Time )
+    if ( id_w_up > 0 )    used = send_data ( id_w_up,    Land_Ice_Atmos_Boundary%w_up,    Time )
+    if ( id_T_up > 0 )    used = send_data ( id_t_up,    Land_Ice_Atmos_Boundary%t_up,    Time )
+    if ( id_q_up > 0 )    used = send_data ( id_q_up,    Land_Ice_Atmos_Boundary%q_up,    Time )
     if ( id_sigma_w > 0 ) then
        call get_from_xgrid (diag_atm, 'ATM', sqrt(ex_sigma_w2), xmap_sfc)
        used = send_data ( id_sigma_w, diag_atm, Time )
@@ -1550,14 +1563,6 @@ contains
     if ( id_corr > 0 ) then
        call get_from_xgrid (diag_atm, 'ATM', ex_corr, xmap_sfc)
        used = send_data ( id_corr, diag_atm, Time )
-    endif
-    if ( id_T_up > 0 ) then
-       call get_from_xgrid (diag_atm, 'ATM', ex_T_up, xmap_sfc)
-       used = send_data ( id_T_up, diag_atm, Time )
-    endif
-    if ( id_q_up > 0 ) then
-       call get_from_xgrid (diag_atm, 'ATM', ex_q_up, xmap_sfc)
-       used = send_data ( id_q_up, diag_atm, Time )
     endif
 ! - slm 2021-07-03
 
