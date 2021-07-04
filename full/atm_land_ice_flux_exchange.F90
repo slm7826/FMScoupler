@@ -161,8 +161,8 @@ module atm_land_ice_flux_exchange_mod
              id_hussLut_land, id_tasLut_land, id_t_flux_land
   integer :: id_t_surf_in, id_t_ca_in, id_q_surf_in, &   ! ZNT 09/03/2020
              ! + slm 2021-06-29
-             id_zeta, id_rich, id_frac_u, id_w_u, id_phi_m, id_phi_t, &
-             id_sigma_t, id_sigma_q, id_corr, id_T_u, id_q_u, &
+             id_zeta, id_rich, id_frac_up, id_w_up, id_phi_m, id_phi_t, &
+             id_sigma_t, id_sigma_q, id_corr, id_T_up, id_q_up, &
              ! - slm 2021-06-29
              id_q_surf_raw, id_t_atm_in, id_q_atm_in, &
              id_t_surf_out, id_t_ca_out, id_q_surf_out, id_t_atm_delt, id_q_atm_delt, &
@@ -776,8 +776,8 @@ contains
          ex_del_q,      &
          ex_frac_open_sea, &
          ! slm 2021-07-03, for surface heterogeneity effects on PBL
-         ex_u_star2, ex_sigma_w2, ex_sigma_w_atm2, ex_frac_u, ex_w_u, &
-         ex_sigma_T, ex_sigma_q, ex_corr, ex_T_u, ex_q_u, &
+         ex_u_star2, ex_sigma_w2, ex_sigma_w_atm2, ex_frac_up, ex_w_up, &
+         ex_sigma_T, ex_sigma_q, ex_corr, ex_T_up, ex_q_up, &
          ex_rho_atm, ex_rich, ex_zeta, ex_phi_m, ex_phi_t ! slm 2021-06-29, optional surface_flux outputs, for surface heterogeneity effects on PBL
 
     real, dimension(n_xgrid_sfc,n_exch_tr) :: ex_tr_atm
@@ -1492,20 +1492,20 @@ contains
 ! calculate updraft area fraction for each tile
     ! we jus need a copy from each grid cell: should we use remap_method=1?
     call put_to_xgrid (sigma_w_atm2, 'ATM', ex_sigma_w_atm2, xmap_sfc, remap_method=remap_method, complete=.true.)
-    ex_frac_u = 0.5*( &
+    ex_frac_up = 0.5*( &
                  !erf(w_max*sqrt(0.5*ex_sigma_w2/ex_sigma_w2)) &
                  erf(w_max*sqrt(0.5)) & ! constant, can be pre-calculated
                  - erf(w_min*sqrt(0.5*ex_sigma_w_atm2/ex_sigma_w2)) &
                  )
     ! protect from cases when the upper limit is less than lower
-    ex_frac_u = max(ex_frac_u,0.0)
+    ex_frac_up = max(ex_frac_up,0.0)
 ! calculate updraft velocity for each tile
-    ex_w_u = sqrt(0.5*ex_sigma_w2/pi)/ex_frac_u * ( &
+    ex_w_up = sqrt(0.5*ex_sigma_w2/pi)/ex_frac_up * ( &
           exp(-0.5*(w_min**2)*ex_sigma_w_atm2/ex_sigma_w2) &
         - exp(-0.5*(w_max**2)) & ! constant, can be pre-calculated
         )
     ! protect from cases when the w_min*sigma_wA > w_max*sigma_wi
-    ex_w_u = max(ex_w_u,0.0)
+    ex_w_up = max(ex_w_up,0.0)
 ! calculate standard deviation of temperature
     ex_sigma_T = ex_flux_t/(ex_rho_atm*cp_air)*2.9/(1-28.4*ex_zeta)**(1.0/3.0)
 ! calculate standard deviation of specific humidity
@@ -1514,17 +1514,17 @@ contains
 ! same for T and q.
     ex_corr = (((1-ct2*ex_zeta)/(1-cw3*ex_zeta))**(1.0/3.0))/(cw2*ct3)
 ! calculate updraft temperature
-    ex_T_u = ex_t_atm + ex_corr*ex_w_u*ex_sigma_t/sqrt(ex_sigma_w2)
+    ex_T_up = ex_t_atm + ex_corr*ex_w_up*ex_sigma_t/sqrt(ex_sigma_w2)
 ! calculate updraft specific humidity
-    ex_q_u = ex_tr_atm(:,isphum) + ex_corr*ex_w_u*ex_sigma_q/sqrt(ex_sigma_w2)
+    ex_q_up = ex_tr_atm(:,isphum) + ex_corr*ex_w_up*ex_sigma_q/sqrt(ex_sigma_w2)
 ! diagnostics
-    if ( id_frac_u > 0 ) then
-       call get_from_xgrid (diag_atm, 'ATM', ex_frac_u, xmap_sfc)
-       used = send_data ( id_frac_u, diag_atm, Time )
+    if ( id_frac_up > 0 ) then
+       call get_from_xgrid (diag_atm, 'ATM', ex_frac_up, xmap_sfc)
+       used = send_data ( id_frac_up, diag_atm, Time )
     endif
-    if ( id_w_u > 0 ) then
-       call get_from_xgrid (diag_atm, 'ATM', ex_w_u, xmap_sfc)
-       used = send_data ( id_w_u, diag_atm, Time )
+    if ( id_w_up > 0 ) then
+       call get_from_xgrid (diag_atm, 'ATM', ex_w_up, xmap_sfc)
+       used = send_data ( id_w_up, diag_atm, Time )
     endif
     if ( id_sigma_T > 0 ) then
        call get_from_xgrid (diag_atm, 'ATM', ex_sigma_T, xmap_sfc)
@@ -1538,13 +1538,13 @@ contains
        call get_from_xgrid (diag_atm, 'ATM', ex_corr, xmap_sfc)
        used = send_data ( id_corr, diag_atm, Time )
     endif
-    if ( id_T_u > 0 ) then
-       call get_from_xgrid (diag_atm, 'ATM', ex_T_u, xmap_sfc)
-       used = send_data ( id_T_u, diag_atm, Time )
+    if ( id_T_up > 0 ) then
+       call get_from_xgrid (diag_atm, 'ATM', ex_T_up, xmap_sfc)
+       used = send_data ( id_T_up, diag_atm, Time )
     endif
-    if ( id_q_u > 0 ) then
-       call get_from_xgrid (diag_atm, 'ATM', ex_q_u, xmap_sfc)
-       used = send_data ( id_q_u, diag_atm, Time )
+    if ( id_q_up > 0 ) then
+       call get_from_xgrid (diag_atm, 'ATM', ex_q_up, xmap_sfc)
+       used = send_data ( id_q_up, diag_atm, Time )
     endif
 ! - slm 2021-07-03
 
@@ -3597,26 +3597,26 @@ contains
     id_phi_t = &
          register_diag_field ( mod_name, 'phi_t',      atmos_axes, Time, &
          'differential stability function for temperature at z_atm', 'none' )
-    id_frac_u = &
-         register_diag_field ( mod_name, 'frac_u',     atmos_axes, Time, &
+    id_frac_up = &
+         register_diag_field ( mod_name, 'frac_up',    atmos_axes, Time, &
          'fractional area of updrafts', 'none' )
-    id_w_u = &
-         register_diag_field ( mod_name, 'w_u',        atmos_axes, Time, &
+    id_w_up = &
+         register_diag_field ( mod_name, 'w_up',       atmos_axes, Time, &
          'updraft vertical velocity', 'm/s' )
-    id_T_u = &
-         register_diag_field ( mod_name, 'T_u',        atmos_axes, Time, &
+    id_T_up = &
+         register_diag_field ( mod_name, 'T_up',       atmos_axes, Time, &
          'updraft temperature', 'deg_K' )
-    id_q_u = &
-         register_diag_field ( mod_name, 'q_u',        atmos_axes, Time, &
+    id_q_up = &
+         register_diag_field ( mod_name, 'q_up',       atmos_axes, Time, &
          'updraft specific humidity', 'kg/kg' )
     id_corr = &
          register_diag_field ( mod_name, 'corr',        atmos_axes, Time, &
          'correlation between vertical velocity and T or q', 'none' )
     id_sigma_T = &
-         register_diag_field ( mod_name, 'sigma_T',     atmos_axes, Time, &
+         register_diag_field ( mod_name, 'stdev_T',     atmos_axes, Time, &
          'standard deviation of temperature', 'deg_K' )
     id_sigma_q = &
-         register_diag_field ( mod_name, 'sigma_q',     atmos_axes, Time, &
+         register_diag_field ( mod_name, 'stdev_q',     atmos_axes, Time, &
          'standard deviation of specific humidity', 'deg_K' )
 
 ! ZNT 09/03/2020: additional output fields
