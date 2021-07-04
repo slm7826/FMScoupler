@@ -1186,6 +1186,7 @@ contains
     !$OMP                                  ex_dhdt_surf,ex_dedt_surf,ex_dfdtr_surf,   &
     !$OMP                                  ex_drdt_surf,ex_dhdt_atm,ex_dfdtr_atm,   &
     !$OMP                                  ex_dtaudu_atm, ex_dtaudv_atm,dt,ex_land, &
+    !$OMP                                  ex_rho_atm, ex_rich, ex_zeta, ex_phi_m, ex_phi_t , & ! slm 2021-06-29
     !$OMP                                  ex_seawater,ex_avail,block_start,block_end,isphum) &
     !$OMP                          private(is,ie)
     do l = 1, my_nblocks
