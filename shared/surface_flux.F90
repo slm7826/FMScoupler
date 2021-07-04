@@ -208,7 +208,7 @@ subroutine surface_flux_1d (                                           &
      dhdt_surf, dedt_surf,  dedq_surf,  drdt_surf,                     &
      dhdt_atm,  dedq_atm,   dtaudu_atm, dtaudv_atm,                    &
      dt,        land,      seawater,     avail,                        &
-     rich,      zeta,       phi_m,      phi_t)  ! optional outputs, slm 2021-06-29
+     rho_atm,   rich,      zeta,         phi_m,      phi_t)  ! optional outputs, slm 2021-06-29
                                                 ! it's easier to make them optional rather than
                                                 ! modify every SCM driver which calls surface_flux
                                                 ! and does not need them
@@ -256,9 +256,10 @@ subroutine surface_flux_1d (                                           &
                                      cd_q    !< Moisture exchange coefficient
   real, intent(inout), dimension(:) :: q_surf !< Mixing ratio at the Earth's surface (kg/kg)
   real, intent(in) :: dt !< Time step (it is not used presently)
-                                     ! + slm, 2021-06-29, for diag and heterogeneous EDMF
+  ! + slm, 2021-06-29, for diag and heterogeneous EDMF
   real, intent(out), dimension(:), optional :: &
                                      rich, & !< Richardson number
+                                     rho_atm, & !< near-surface air density
                                      zeta, & !< Monin-Obukhov scaling parameteter, z/L
                                      phi_m, & !< differential stability function for momentum, at z_atm
                                      phi_t    !< differential stability function for heat, at z_atm
@@ -473,6 +474,8 @@ subroutine surface_flux_1d (                                           &
         dtaudv_atm = -cd_m*rho*(dw_atmdv*v_dif + w_atm)
      endwhere
   endif
+
+  if (present(rho_atm)) rho_atm(:) = rho(:)
 
 end subroutine surface_flux_1d
 

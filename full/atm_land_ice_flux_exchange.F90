@@ -70,7 +70,7 @@ module atm_land_ice_flux_exchange_mod
   use  time_manager_mod,  only: time_type
   use sat_vapor_pres_mod, only: compute_qs, sat_vapor_pres_init
   use      constants_mod, only: rdgas, rvgas, cp_air, stefan, WTMAIR, HLV, HLF, Radius, &
-                                PI, CP_OCEAN, WTMCO2, WTMC, EPSLN, GRAV
+                                PI, CP_OCEAN, WTMCO2, WTMC, EPSLN, GRAV, VONKARM
   use fms_mod,            only: clock_flag_default, check_nml_error, error_mesg
   use fms_mod,            only: open_namelist_file, write_version_number
   use data_override_mod,  only: data_override
@@ -159,7 +159,7 @@ module atm_land_ice_flux_exchange_mod
              id_q_ref,  id_q_ref_land, id_q_flux_land, id_rh_ref_cmip, &
              id_hussLut_land, id_tasLut_land, id_t_flux_land
   integer :: id_t_surf_in, id_t_ca_in, id_q_surf_in, &   ! ZNT 09/03/2020
-             id_zeta, id_rich, id_phi_m, id_phi_t, & ! slm 2021-06-29
+             id_zeta, id_rich, id_frac_u, id_w_u, id_phi_m, id_phi_t, & ! slm 2021-06-29
              id_q_surf_raw, id_t_atm_in, id_q_atm_in, &
              id_t_surf_out, id_t_ca_out, id_q_surf_out, id_t_atm_delt, id_q_atm_delt, &
              id_t_flux_first, id_t_flux_second, id_q_flux_first, id_q_flux_second
@@ -744,12 +744,14 @@ contains
          ex_del_h,      &
          ex_del_q,      &
          ex_frac_open_sea, &
-         ex_rich, ex_zeta, ex_phi_m, ex_phi_t ! slm 2021-06-29, optional surface_flux outputs for heterogeneous ABL
+         ex_u_star2, ex_sigma_w2, ex_sigma_w_atm2, ex_frac_u, ex_w_u, & ! slm 2021-07-03, for ABL hetergeneity effects
+         ex_rho_atm, ex_rich, ex_zeta, ex_phi_m, ex_phi_t ! slm 2021-06-29, optional surface_flux outputs for heterogeneous ABL
 
     real, dimension(n_xgrid_sfc,n_exch_tr) :: ex_tr_atm
     ! jgj: added for co2_atm diagnostic
     real, dimension(n_xgrid_sfc)           :: ex_co2_atm_dvmr
     real, dimension(size(Land_Ice_Atmos_Boundary%t,1),size(Land_Ice_Atmos_Boundary%t,2)) :: diag_atm
+
 #ifndef _USE_LEGACY_LAND_
     real, dimension(size(Land%t_ca, 1),size(Land%t_ca,2)) :: diag_land
     real, dimension(size(Land%t_ca, 1))                   :: diag_land_ug, tile_size_ug
@@ -769,6 +771,11 @@ contains
     integer :: i
     integer :: is,ie,l,j
     integer :: isc,iec,jsc,jec
+
+! + slm 2021-07-03: variables for heterogeneous ABL
+    real, dimension(size(Land_Ice_Atmos_Boundary%t,1),size(Land_Ice_Atmos_Boundary%t,2)) :: &
+       rho_atm, u_star2, zeta_atm, sigma_w_atm2
+! - slm 2021-07-03
 
     ! [1] check that the module was initialized
     if (do_init) call error_mesg ('atm_land_ice_flux_exchange_mod',  &
@@ -1165,7 +1172,7 @@ contains
             ex_dhdt_atm(is:ie),  ex_dfdtr_atm(is:ie,isphum),  ex_dtaudu_atm(is:ie), ex_dtaudv_atm(is:ie),       &
             dt,                                                             &
             ex_land(is:ie), ex_seawater(is:ie) .gt. 0.0,  ex_avail(is:ie),  &
-            ex_rich(is:ie), ex_zeta(is:ie), ex_phi_m(is:ie), ex_phi_t(is:ie) ) ! slm 2021-06-29
+            ex_rho_atm(is:ie), ex_rich(is:ie), ex_zeta(is:ie), ex_phi_m(is:ie), ex_phi_t(is:ie) ) ! slm 2021-06-29
     enddo
 
 #ifdef SCM
@@ -1434,6 +1441,49 @@ contains
     call get_from_xgrid (Land_Ice_Atmos_Boundary%wind,      'ATM', ex_wind      , xmap_sfc) ! ZNT 04/29/2020
     call get_from_xgrid (Land_Ice_Atmos_Boundary%thv_atm,   'ATM', ex_thv_atm   , xmap_sfc) ! ZNT 05/03/2020
     call get_from_xgrid (Land_Ice_Atmos_Boundary%thv_surf,  'ATM', ex_thv_surf  , xmap_sfc) ! ZNT 05/03/2020
+
+! + slm 2021-07-03 calculations for heterogeneity effect on ABL
+! calculate variance of vertical velocity for each tile
+    ex_u_star2  = ex_u_star**2
+    ex_sigma_w2 = 1.5*ex_u_star2*max(1-3*ex_zeta,0.0)**(2.0/3.0)
+! calculate variance of vertical velocity for the entire grid cell
+    call get_from_xgrid (u_star2, 'ATM', ex_u_star2, xmap_sfc) ! grid-average u_star**2
+    call get_from_xgrid (rho_atm, 'ATM', ex_rho_atm, xmap_sfc) ! grid-average density
+    ! characteristic grid-cell Monin-Obukhov length
+    ! assuming shflx is defined above (use_AM3_physics not defined)
+    zeta_atm = - VONKARM*grav*Land_Ice_Atmos_Boundary%shflx /  &
+                (Land_Ice_Atmos_Boundary%thv_atm*rho_atm*cp_air * sqrt(u_star2)**3)
+    ! finally, standard deviation of vertical velocity for the entire grid cell
+    ! where (L_atm/=0) ...
+    sigma_w_atm2 = 1.5*u_star2*max(1-3*zeta_atm,0.0)**(2.0/3.0)
+! calculate updraft area fraction for each tile
+    ! we jus need a copy from each grid cell: should we use remap_method=1?
+    call put_to_xgrid (sigma_w_atm2, 'ATM', ex_sigma_w_atm2, xmap_sfc, remap_method=remap_method, complete=.true.)
+    ex_frac_u = 0.5*( &
+                 !erf(3.0*sqrt(0.5*ex_sigma_w2/ex_sigma_w2)) &
+                 erf(3.0*sqrt(0.5)) & ! constant, can be pre-calculated
+                 - erf(1.2*sqrt(0.5*ex_sigma_w_atm2/ex_sigma_w2)) &
+                 )
+    ! protect from cases when the upper limit is less than lower
+    ex_frac_u = max(ex_frac_u,0.0)
+! calculate updraft velocity for each tile
+    ex_w_u = sqrt(0.5*ex_sigma_w2/pi)/ex_frac_u * ( &
+          exp(-0.5*(1.2**2)*ex_sigma_w_atm2/ex_sigma_w2) &
+        - exp(-0.5*(3.0**2))&
+        )
+    ! protect from cases when the 1.2*sigma_wA > 3*sigma_wi
+    ex_w_u = max(ex_w_u,0.0)
+! diagnostics
+    if ( id_frac_u > 0 ) then
+       call get_from_xgrid (diag_atm, 'ATM', ex_frac_u, xmap_sfc)
+       used = send_data ( id_frac_u, diag_atm, Time )
+    endif
+    if ( id_w_u > 0 ) then
+       call get_from_xgrid (diag_atm, 'ATM', ex_w_u, xmap_sfc)
+       used = send_data ( id_w_u, diag_atm, Time )
+    endif
+
+! - slm 2021-07-03
 
 #ifdef use_AM3_physics
     if (do_forecast) then
@@ -3484,6 +3534,12 @@ contains
     id_phi_t = &
          register_diag_field ( mod_name, 'phi_t',      atmos_axes, Time, &
          'differential stability function for temperature at z_atm', 'none' )
+    id_frac_u = &
+         register_diag_field ( mod_name, 'frac_u',     atmos_axes, Time, &
+         'fractional area of updrafts', 'none' )
+    id_w_u = &
+         register_diag_field ( mod_name, 'w_u',        atmos_axes, Time, &
+         'updraft vertical velocity', 'm/s' )
 
 ! ZNT 09/03/2020: additional output fields
     id_t_surf_in     = &
