@@ -71,7 +71,7 @@ module atm_land_ice_flux_exchange_mod
   use sat_vapor_pres_mod, only: compute_qs, sat_vapor_pres_init
   use      constants_mod, only: rdgas, rvgas, cp_air, stefan, WTMAIR, HLV, HLF, Radius, &
                                 PI, CP_OCEAN, WTMCO2, WTMC, EPSLN, GRAV, VONKARM
-  use fms_mod,            only: clock_flag_default, check_nml_error, error_mesg
+  use fms_mod,            only: clock_flag_default, file_exist, check_nml_error, error_mesg
   use fms_mod,            only: open_namelist_file, write_version_number
   use data_override_mod,  only: data_override
   use coupler_types_mod,  only: coupler_1d_bc_type, coupler_type_copy, ind_psurf, ind_u10, ind_flux, ind_flux0
@@ -130,9 +130,10 @@ module atm_land_ice_flux_exchange_mod
             atm_stock_integrate,  &
             send_ice_mask_sic
 
-  !-----------------------------------------------------------------------
-  character(len=128) :: version = '$Id$'
-  character(len=128) :: tag = '$Name$'
+! ---- version number for this module ------------------------------------
+! Include variable "version" to be written to log file.
+#include <file_version.h>
+
   !-----------------------------------------------------------------------
   !---- exchange grid maps -----
 
@@ -316,6 +317,12 @@ module atm_land_ice_flux_exchange_mod
   integer :: nxc_ice=0, nyc_ice=0, nk_ice=0
   integer :: nxc_lnd=0, nyc_lnd=0
 
+! namelist for surface heterogeneity effects on PBL
+  real :: w_min = 1.2, w_max = 3.0 ! limits of vertical velocity PDF integration (expressed
+      ! as fractions of its standard deviation) for calculations of updraft area fraction
+      ! and their vertical velocity
+  namelist /hetero_pbl_nml/ w_min, w_max
+
 contains
 
   !#######################################################################
@@ -367,6 +374,25 @@ contains
     character(32)  :: method
     character(512) :: parameters
     real           :: value
+
+    integer :: unit, ierr, io
+
+    call write_version_number("atm_land_ice_flux_exchange_mod", version)
+
+    if ( file_exist('input.nml')) then
+#ifdef INTERNAL_FILE_NML
+      read(input_nml_file, nml=hetero_pbl_nml, iostat=io)
+      ierr = check_nml_error(io, 'hetero_pbl_nml')
+#else
+      unit = open_namelist_file ( )
+      ierr=1
+      do while (ierr /= 0)
+         read  (unit, nml=atmos_model_nml, iostat=io, end=10)
+         ierr = check_nml_error(io,'hetero_pbl_nml')
+      enddo
+ 10     call close_file (unit)
+#endif
+    endif
 
     Dt_atm = Dt_atm_in
     Dt_cpl = Dt_cpl_in
@@ -744,8 +770,8 @@ contains
          ex_del_h,      &
          ex_del_q,      &
          ex_frac_open_sea, &
-         ex_u_star2, ex_sigma_w2, ex_sigma_w_atm2, ex_frac_u, ex_w_u, & ! slm 2021-07-03, for ABL hetergeneity effects
-         ex_rho_atm, ex_rich, ex_zeta, ex_phi_m, ex_phi_t ! slm 2021-06-29, optional surface_flux outputs for heterogeneous ABL
+         ex_u_star2, ex_sigma_w2, ex_sigma_w_atm2, ex_frac_u, ex_w_u, & ! slm 2021-07-03, for surface heterogeneity effects on PBL
+         ex_rho_atm, ex_rich, ex_zeta, ex_phi_m, ex_phi_t ! slm 2021-06-29, optional surface_flux outputs, for surface heterogeneity effects on PBL
 
     real, dimension(n_xgrid_sfc,n_exch_tr) :: ex_tr_atm
     ! jgj: added for co2_atm diagnostic
@@ -772,7 +798,7 @@ contains
     integer :: is,ie,l,j
     integer :: isc,iec,jsc,jec
 
-! + slm 2021-07-03: variables for heterogeneous ABL
+! + slm 2021-07-03: variables for surface heterogeneity effects on PBL
     real, dimension(size(Land_Ice_Atmos_Boundary%t,1),size(Land_Ice_Atmos_Boundary%t,2)) :: &
        rho_atm, u_star2, zeta_atm, sigma_w_atm2
 ! - slm 2021-07-03
@@ -1198,7 +1224,7 @@ contains
     endif
 #endif
 
-! slm 2021-06-29 send variables needed by heterogeneous ABL to the diagnostics
+! slm 2021-06-29 send variables of surface heterogeneity effects on PBL to the diagnostics
     if ( id_rich > 0 ) then
        call get_from_xgrid (diag_atm, 'ATM', ex_rich, xmap_sfc)
        used = send_data ( id_rich, diag_atm, Time )
@@ -1442,7 +1468,7 @@ contains
     call get_from_xgrid (Land_Ice_Atmos_Boundary%thv_atm,   'ATM', ex_thv_atm   , xmap_sfc) ! ZNT 05/03/2020
     call get_from_xgrid (Land_Ice_Atmos_Boundary%thv_surf,  'ATM', ex_thv_surf  , xmap_sfc) ! ZNT 05/03/2020
 
-! + slm 2021-07-03 calculations for heterogeneity effect on ABL
+! + slm 2021-07-03 calculations for surface heterogeneity effects on PBL
 ! calculate variance of vertical velocity for each tile
     ex_u_star2  = ex_u_star**2
     ex_sigma_w2 = 1.5*ex_u_star2*max(1-3*ex_zeta,0.0)**(2.0/3.0)
@@ -1450,7 +1476,7 @@ contains
     call get_from_xgrid (u_star2, 'ATM', ex_u_star2, xmap_sfc) ! grid-average u_star**2
     call get_from_xgrid (rho_atm, 'ATM', ex_rho_atm, xmap_sfc) ! grid-average density
     ! characteristic grid-cell Monin-Obukhov length
-    ! assuming shflx is defined above (use_AM3_physics not defined)
+    ! assuming shflx is calculated above (i.e. use_AM3_physics is not defined)
     zeta_atm = - VONKARM*grav*Land_Ice_Atmos_Boundary%shflx /  &
                 (Land_Ice_Atmos_Boundary%thv_atm*rho_atm*cp_air * sqrt(u_star2)**3)
     ! finally, standard deviation of vertical velocity for the entire grid cell
@@ -1460,18 +1486,18 @@ contains
     ! we jus need a copy from each grid cell: should we use remap_method=1?
     call put_to_xgrid (sigma_w_atm2, 'ATM', ex_sigma_w_atm2, xmap_sfc, remap_method=remap_method, complete=.true.)
     ex_frac_u = 0.5*( &
-                 !erf(3.0*sqrt(0.5*ex_sigma_w2/ex_sigma_w2)) &
-                 erf(3.0*sqrt(0.5)) & ! constant, can be pre-calculated
-                 - erf(1.2*sqrt(0.5*ex_sigma_w_atm2/ex_sigma_w2)) &
+                 !erf(w_max*sqrt(0.5*ex_sigma_w2/ex_sigma_w2)) &
+                 erf(w_max*sqrt(0.5)) & ! constant, can be pre-calculated
+                 - erf(w_min*sqrt(0.5*ex_sigma_w_atm2/ex_sigma_w2)) &
                  )
     ! protect from cases when the upper limit is less than lower
     ex_frac_u = max(ex_frac_u,0.0)
 ! calculate updraft velocity for each tile
     ex_w_u = sqrt(0.5*ex_sigma_w2/pi)/ex_frac_u * ( &
-          exp(-0.5*(1.2**2)*ex_sigma_w_atm2/ex_sigma_w2) &
-        - exp(-0.5*(3.0**2))&
+          exp(-0.5*(w_min**2)*ex_sigma_w_atm2/ex_sigma_w2) &
+        - exp(-0.5*(w_max**2)) & ! constant, can be pre-calculated
         )
-    ! protect from cases when the 1.2*sigma_wA > 3*sigma_wi
+    ! protect from cases when the w_min*sigma_wA > w_max*sigma_wi
     ex_w_u = max(ex_w_u,0.0)
 ! diagnostics
     if ( id_frac_u > 0 ) then
@@ -3521,7 +3547,7 @@ contains
          register_diag_field ( mod_name, 'del_q',      atmos_axes, Time,     &
          'ref height interp factor for moisture','none' )
 
-! slm 2021-06-29, diagnostics for heterogeneous ABL variables
+! slm 2021-06-29, diagnostics for surface heterogeneity effects on PBL
     id_zeta = &
          register_diag_field ( mod_name, 'zeta',       atmos_axes, Time, &
          'Monin-Obukhov scaling, z/L', 'none' )
