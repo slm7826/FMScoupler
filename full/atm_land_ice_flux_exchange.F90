@@ -162,7 +162,7 @@ module atm_land_ice_flux_exchange_mod
   integer :: id_t_surf_in, id_t_ca_in, id_q_surf_in, &   ! ZNT 09/03/2020
              ! + slm 2021-06-29
              id_zeta, id_rich, id_frac_up, id_w_up, id_phi_m, id_phi_t, &
-             id_sigma_t, id_sigma_q, id_corr, id_T_up, id_q_up, &
+             id_sigma_w, id_sigma_t, id_sigma_q, id_corr, id_T_up, id_q_up, &
              ! - slm 2021-06-29
              id_q_surf_raw, id_t_atm_in, id_q_atm_in, &
              id_t_surf_out, id_t_ca_out, id_q_surf_out, id_t_atm_delt, id_q_atm_delt, &
@@ -324,7 +324,7 @@ module atm_land_ice_flux_exchange_mod
   real :: w_min = 1.2, w_max = 3.0 ! limits of vertical velocity PDF integration (expressed
       ! as fractions of its standard deviation) for calculations of updraft area fraction
       ! and their vertical velocity
-  real :: ct2 = 28.4, cw2=1.25, ct3=2.9, cw3 = 3.0 ! correlation calculation coefficients
+  real :: ct2 = 28.4, cw2 = 1.25, ct3 = 2.9, cw3 = 3.0 ! correlation calculation coefficients
   namelist /hetero_pbl_nml/ w_min, w_max, &
       ct2, cw2, ct3, cw3
 
@@ -1515,9 +1515,17 @@ contains
 ! same for T and q.
     ex_corr = (((1-ct2*ex_zeta)/(1-cw3*ex_zeta))**(1.0/3.0))/(cw2*ct3)
 ! calculate updraft temperature
-    ex_T_up = ex_t_atm + ex_corr*ex_w_up*ex_sigma_t/sqrt(ex_sigma_w2)
+    where (ex_sigma_w2>0)
+       ex_T_up = ex_t_atm + ex_corr*ex_w_up*ex_sigma_t/sqrt(ex_sigma_w2)
+    elsewhere
+       ex_T_up = ex_t_atm
+    end where
 ! calculate updraft specific humidity
-    ex_q_up = ex_tr_atm(:,isphum) + ex_corr*ex_w_up*ex_sigma_q/sqrt(ex_sigma_w2)
+    where (ex_sigma_w2>0)
+       ex_q_up = ex_tr_atm(:,isphum) + ex_corr*ex_w_up*ex_sigma_q/sqrt(ex_sigma_w2)
+    elsewhere
+       ex_q_up = ex_tr_atm(:,isphum)
+    end where
 ! diagnostics
     if ( id_frac_up > 0 ) then
        call get_from_xgrid (diag_atm, 'ATM', ex_frac_up, xmap_sfc)
@@ -1526,6 +1534,10 @@ contains
     if ( id_w_up > 0 ) then
        call get_from_xgrid (diag_atm, 'ATM', ex_w_up, xmap_sfc)
        used = send_data ( id_w_up, diag_atm, Time )
+    endif
+    if ( id_sigma_w > 0 ) then
+       call get_from_xgrid (diag_atm, 'ATM', sqrt(ex_sigma_w2), xmap_sfc)
+       used = send_data ( id_sigma_w, diag_atm, Time )
     endif
     if ( id_sigma_T > 0 ) then
        call get_from_xgrid (diag_atm, 'ATM', ex_sigma_T, xmap_sfc)
@@ -3605,7 +3617,7 @@ contains
          register_diag_field ( mod_name, 'w_up',       atmos_axes, Time, &
          'updraft vertical velocity', 'm/s' )
     id_T_up = &
-         register_diag_field ( mod_name, 'T_up',       atmos_axes, Time, &
+         register_diag_field ( mod_name, 't_up',       atmos_axes, Time, &
          'updraft temperature', 'deg_K' )
     id_q_up = &
          register_diag_field ( mod_name, 'q_up',       atmos_axes, Time, &
@@ -3613,8 +3625,11 @@ contains
     id_corr = &
          register_diag_field ( mod_name, 'corr',        atmos_axes, Time, &
          'correlation between vertical velocity and T or q', 'none' )
+    id_sigma_w = &
+         register_diag_field ( mod_name, 'stdev_w',     atmos_axes, Time, &
+         'standard deviation of vertical velocity', 'm/s' )
     id_sigma_T = &
-         register_diag_field ( mod_name, 'stdev_T',     atmos_axes, Time, &
+         register_diag_field ( mod_name, 'stdev_t',     atmos_axes, Time, &
          'standard deviation of temperature', 'deg_K' )
     id_sigma_q = &
          register_diag_field ( mod_name, 'stdev_q',     atmos_axes, Time, &
