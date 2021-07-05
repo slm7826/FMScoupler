@@ -1500,27 +1500,32 @@ contains
     ! finally, standard deviation of vertical velocity for the entire grid cell
     ! where (L_atm/=0) ...
     sigma_w_atm2 = 1.5*u_star2*max(1-3*zeta_atm,0.0)**(2.0/3.0)
-! calculate updraft area fraction for each tile
     ! we jus need a copy from each grid cell: should we use remap_method=1?
     call put_to_xgrid (sigma_w_atm2, 'ATM', ex_sigma_w_atm2, xmap_sfc, remap_method=remap_method, complete=.true.)
-    ex_frac_up = 0.5*( &
-                 !erf(w_max*sqrt(0.5*ex_sigma_w2/ex_sigma_w2)) &
-                 erf(w_max*sqrt(0.5)) & ! constant, can be pre-calculated
+    where (ex_flux_t > 0)
+       ! calculate updraft area fraction for each tile
+       ex_frac_up = 0.5*( &
+                 ! erf(w_max*sqrt(0.5*ex_sigma_w2/ex_sigma_w2)) &
+                   erf(w_max*sqrt(0.5)) & ! constant, can be pre-calculated
                  - erf(w_min*sqrt(0.5*ex_sigma_w_atm2/ex_sigma_w2)) &
                  )
-    ! protect from cases when the upper limit is less than lower
-    ex_frac_up = max(ex_frac_up,0.0)
-! calculate updraft velocity for each tile
-    ex_w_up = sqrt(0.5*ex_sigma_w2/pi)/ex_frac_up * ( &
-          exp(-0.5*(w_min**2)*ex_sigma_w_atm2/ex_sigma_w2) &
-        - exp(-0.5*(w_max**2)) & ! constant, can be pre-calculated
-        )
-    ! protect from cases when the w_min*sigma_wA > w_max*sigma_wi
-    ex_w_up = max(ex_w_up,0.0)
+       ! protect from cases when the upper limit is less than lower
+       ex_frac_up = max(ex_frac_up,0.0)
+       ! calculate updraft velocity for each tile
+       ex_w_up = sqrt(0.5*ex_sigma_w2/pi)/ex_frac_up * ( &
+                   exp(-0.5*(w_min**2)*ex_sigma_w_atm2/ex_sigma_w2) &
+                 - exp(-0.5*(w_max**2)) & ! constant, can be pre-calculated
+                 )
+       ! protect from cases when the w_min*sigma_wA > w_max*sigma_wi
+       ex_w_up = max(ex_w_up,0.0)
+    elsewhere
+       ex_frac_up = 0.0
+       ex_w_up    = 0.0
+    end where
 ! calculate standard deviation of temperature
-    ex_sigma_T = ex_flux_t/(ex_rho_atm*cp_air)*2.9/(1-28.4*ex_zeta)**(1.0/3.0)
+    ex_sigma_T = abs(ex_flux_t)/(ex_u_star*ex_rho_atm*cp_air)*2.9/(1-28.4*ex_zeta)**(1.0/3.0)
 ! calculate standard deviation of specific humidity
-    ex_sigma_q = ex_flux_tr(:,isphum)/ex_rho_atm**2.9/(1-28.4*ex_zeta)**(1.0/3.0)
+    ex_sigma_q = abs(ex_flux_tr(:,isphum))/(ex_u_star*ex_rho_atm)*2.9/(1-28.4*ex_zeta)**(1.0/3.0)
 ! calculate the correlation coefficients between vertical velocity and T, q. It is the
 ! same for T and q.
     ex_corr = (((1-ct2*ex_zeta)/(1-cw3*ex_zeta))**(1.0/3.0))/(cw2*ct3)
