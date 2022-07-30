@@ -728,7 +728,7 @@ contains
          ex_gust,       &
          ex_t_surf4,    &
          ex_u_surf, ex_v_surf,  &
-         ex_rough_mom, ex_rough_heat, ex_rough_moist, &
+         ex_rough_mom, ex_rough_heat, ex_rough_moist, ex_rsl_scale, &
          ex_rough_scale,&
          ex_q_star,     &
          ex_cd_q,       &
@@ -867,7 +867,7 @@ contains
     !$OMP parallel do default(none) shared(my_nblocks,block_start,block_end,ex_t_surf,ex_u_surf, &
     !$OMP                                  ex_v_surf,ex_albedo,ex_albedo_vis_dir,ex_albedo_nir_dir, &
     !$OMP                                  ex_albedo_vis_dif,ex_albedo_nir_dif,ex_cd_t,ex_cd_m,  &
-    !$OMP                                  ex_cd_q,ex_frac_open_sea)                             &
+    !$OMP                                  ex_cd_q,ex_frac_open_sea, ex_rsl_scale)               &
     !$OMP                          private(is,ie)
     do l = 1, my_nblocks
        is=block_start(l)
@@ -887,6 +887,8 @@ contains
           ex_cd_m(i) = 0.0
           ex_cd_q(i) = 0.0
           ex_frac_open_sea(i) =0.
+
+          ex_rsl_scale(i) = 0.0
        enddo
     enddo
     !-----------------------------------------------------------------------
@@ -1040,6 +1042,7 @@ contains
     call put_to_xgrid (Ice%rough_mom,   'OCN', ex_rough_mom,   xmap_sfc)
     call put_to_xgrid (Ice%rough_heat,  'OCN', ex_rough_heat,  xmap_sfc)
     call put_to_xgrid (Ice%rough_moist, 'OCN', ex_rough_moist, xmap_sfc)
+    ! we are assuming roughness sublayer only exists over land, so rsl_scale remains zero over the ocean
     call put_to_xgrid (Ice%albedo,      'OCN', ex_albedo,      xmap_sfc)
     call put_to_xgrid (Ice%albedo_vis_dir, 'OCN', ex_albedo_vis_dir, xmap_sfc)
     call put_to_xgrid (Ice%albedo_nir_dir, 'OCN', ex_albedo_nir_dir, xmap_sfc)
@@ -1077,6 +1080,7 @@ contains
     call put_to_xgrid_land (Land%rough_mom,  'LND', ex_rough_mom,   xmap_sfc)
     call put_to_xgrid_land (Land%rough_heat, 'LND', ex_rough_heat,  xmap_sfc)
     call put_to_xgrid_land (Land%rough_heat, 'LND', ex_rough_moist, xmap_sfc)
+    call put_to_xgrid_land (Land%rsl_scale,  'LND', ex_rsl_scale,   xmap_sfc)
     call put_to_xgrid_land (Land%albedo,     'LND', ex_albedo,      xmap_sfc)
     call put_to_xgrid_land (Land%albedo_vis_dir,     'LND', ex_albedo_vis_dir,   xmap_sfc)
     call put_to_xgrid_land (Land%albedo_nir_dir,     'LND', ex_albedo_nir_dir,   xmap_sfc)
@@ -1120,6 +1124,7 @@ contains
           ex_rough_mom   = ROUGH_MOM
           ex_rough_heat  = ROUGH_HEAT
           ex_rough_moist = ROUGH_HEAT
+          ex_rsl_scale   = 0.0 ! or should it be NaN ? or come from SCM?
        endif
     endif
 #endif
@@ -1135,7 +1140,7 @@ contains
     !$OMP parallel do default(none) shared(my_nblocks,ex_t_atm,ex_tr_atm,ex_u_atm,ex_v_atm, &
     !$OMP                                  ex_p_atm,ex_z_atm,ex_p_surf,ex_t_surf,ex_t_ca, &
     !$OMP                                  ex_tr_surf,ex_u_surf,ex_v_surf,ex_rough_mom, &
-    !$OMP                                  ex_rough_heat,ex_rough_moist,ex_rough_scale,    &
+    !$OMP                                  ex_rough_heat,ex_rough_moist,ex_rsl_scale,ex_rough_scale, &
     !$OMP                                  ex_gust,ex_flux_t,ex_flux_tr,ex_flux_lw, &
     !$OMP                                  ex_flux_u,ex_flux_v,ex_cd_m,ex_cd_t,ex_cd_q, &
     !$OMP                                  ex_wind,ex_u_star,ex_b_star,ex_q_star,       &
@@ -1151,7 +1156,7 @@ contains
             ex_t_atm(is:ie), ex_tr_atm(is:ie,isphum),  ex_u_atm(is:ie), ex_v_atm(is:ie),  ex_p_atm(is:ie),  ex_z_atm(is:ie),  &
             ex_p_surf(is:ie),ex_t_surf(is:ie), ex_t_ca(is:ie),  ex_tr_surf(is:ie,isphum),                       &
             ex_u_surf(is:ie), ex_v_surf(is:ie),                                           &
-            ex_rough_mom(is:ie), ex_rough_heat(is:ie), ex_rough_moist(is:ie), ex_rough_scale(is:ie),    &
+            ex_rough_mom(is:ie), ex_rough_heat(is:ie), ex_rough_moist(is:ie), ex_rsl_scale(is:ie), ex_rough_scale(is:ie),    &
             ex_gust(is:ie),                                                        &
             ex_flux_t(is:ie), ex_flux_tr(is:ie,isphum), ex_flux_lw(is:ie), ex_flux_u(is:ie), ex_flux_v(is:ie),         &
             ex_cd_m(is:ie),   ex_cd_t(is:ie), ex_cd_q(is:ie),                                    &
@@ -1170,7 +1175,7 @@ contains
             ex_t_atm, ex_tr_atm(:,isphum),  ex_u_atm, ex_v_atm,  ex_p_atm,  ex_z_atm,  &
             ex_p_surf,ex_t_surf, ex_t_ca,  ex_tr_surf(:,isphum),                       &
             ex_u_surf, ex_v_surf,                                                      &
-            ex_rough_mom, ex_rough_heat, ex_rough_moist, ex_rough_scale,               &
+            ex_rough_mom, ex_rough_heat, ex_rough_moist, ex_rsl_scale, ex_rough_scale, &
             ex_gust,                                                                   &
             ex_flux_t, ex_flux_tr(:,isphum), ex_flux_lw, ex_flux_u, ex_flux_v,         &
             ex_cd_m,   ex_cd_t, ex_cd_q,                                               &
@@ -1178,7 +1183,7 @@ contains
             ex_dhdt_surf, ex_dedt_surf, ex_dfdtr_surf(:,isphum),  ex_drdt_surf,        &
             ex_dhdt_atm,  ex_dfdtr_atm(:,isphum),  ex_dtaudu_atm, ex_dtaudv_atm,       &
             dt,                                                                        &
-            ex_land, ex_seawater .gt. 0.0,  ex_avail,                                    &
+            ex_land, ex_seawater .gt. 0.0,  ex_avail,                                  &
             ex_dhdt_surf_forland,  ex_dedt_surf_forland,  ex_dedq_surf_forland  )
 
     endif

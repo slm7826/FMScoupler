@@ -200,7 +200,7 @@ subroutine surface_flux_1d (                                           &
      t_atm,     q_atm_in,   u_atm,     v_atm,     p_atm,     z_atm,    &
      p_surf,    t_surf,     t_ca,      q_surf,                         &
      u_surf,    v_surf,                                                &
-     rough_mom, rough_heat, rough_moist, rough_scale, gust,            &
+     rough_mom, rough_heat, rough_moist, rsl_scale, rough_scale, gust, &
      flux_t, flux_q, flux_r, flux_u, flux_v,                           &
      cd_m,      cd_t,       cd_q,                                      &
      w_atm,     u_star,     b_star,     q_star,                        &
@@ -225,6 +225,7 @@ subroutine surface_flux_1d (                                           &
                                      rough_mom, & !< Momentum roughness length
                                      rough_heat, & !< Heat roughness length
                                      rough_moist, & !< Moisture roughness length
+                                     rsl_scale, & !< Roughness sublayer length scale, m
                                      rough_scale, & !< Scale factor used to topographic roughness calculation
                                      gust !< Gustiness factor
   real, intent(out), dimension(:) :: flux_t, & !< Sensible heat flux
@@ -359,9 +360,9 @@ subroutine surface_flux_1d (                                           &
   endif
 
   !  monin-obukhov similarity theory
-  call mo_drag (thv_atm, thv_surf, z_atm,                  &
-       rough_mom, rough_heat, rough_moist, w_atm,          &
-       cd_m, cd_t, cd_q, u_star, b_star, avail             )
+  call mo_drag (thv_atm, thv_surf, z_atm,                    &
+       rough_mom, rough_heat, rough_moist, rsl_scale, w_atm, &
+       cd_m, cd_t, cd_q, u_star, b_star, avail               )
 
   ! override with ocean fluxes from NCAR calculation
   if (ncar_ocean_flux .or. ncar_ocean_flux_orig) then
@@ -452,16 +453,16 @@ end subroutine surface_flux_1d
 
 
 !#######################################################################
-subroutine surface_flux_0d (                                                 &
-     t_atm_0,     q_atm_0,      u_atm_0,     v_atm_0,   p_atm_0, z_atm_0,    &
-     p_surf_0,    t_surf_0,     t_ca_0,      q_surf_0,                       &
-     u_surf_0,    v_surf_0,                                                  &
-     rough_mom_0, rough_heat_0, rough_moist_0, rough_scale_0, gust_0,        &
-     flux_t_0,    flux_q_0,     flux_r_0,    flux_u_0,  flux_v_0,            &
-     cd_m_0,      cd_t_0,       cd_q_0,                                      &
-     w_atm_0,     u_star_0,     b_star_0,     q_star_0,                      &
-     dhdt_surf_0, dedt_surf_0,  dedq_surf_0,  drdt_surf_0,                   &
-     dhdt_atm_0,  dedq_atm_0,   dtaudu_atm_0, dtaudv_atm_0,                  &
+subroutine surface_flux_0d (                                                       &
+     t_atm_0,     q_atm_0,      u_atm_0,     v_atm_0,   p_atm_0, z_atm_0,          &
+     p_surf_0,    t_surf_0,     t_ca_0,      q_surf_0,                             &
+     u_surf_0,    v_surf_0,                                                        &
+     rough_mom_0, rough_heat_0, rough_moist_0, rsl_scale_0, rough_scale_0, gust_0, &
+     flux_t_0,    flux_q_0,     flux_r_0,    flux_u_0,  flux_v_0,                  &
+     cd_m_0,      cd_t_0,       cd_q_0,                                            &
+     w_atm_0,     u_star_0,     b_star_0,     q_star_0,                            &
+     dhdt_surf_0, dedt_surf_0,  dedq_surf_0,  drdt_surf_0,                         &
+     dhdt_atm_0,  dedq_atm_0,   dtaudu_atm_0, dtaudv_atm_0,                        &
      dt,          land_0,       seawater_0,  avail_0  )
 
   ! ---- arguments -----------------------------------------------------------
@@ -482,6 +483,7 @@ subroutine surface_flux_0d (                                                 &
                       rough_mom_0, & !< Momentum roughness length
                       rough_heat_0, & !< Heat roughness length
                       rough_moist_0, & !< Moisture roughness length
+                      rsl_scale_0, & ! Roughness sublayer length scale, m
                       rough_scale_0, & !< Scale factor used to topographic roughness calculation
                       gust_0 !< Gustiness factor
   real, intent(out) :: flux_t_0, & !< Sensible heat flux
@@ -513,7 +515,7 @@ subroutine surface_flux_0d (                                                 &
        t_atm,     q_atm,      u_atm,     v_atm,              &
        p_atm,     z_atm,      t_ca,                          &
        p_surf,    t_surf,     u_surf,    v_surf,             &
-       rough_mom, rough_heat, rough_moist,  rough_scale, gust
+       rough_mom, rough_heat, rough_moist, rsl_scale, rough_scale, gust
   real, dimension(1) :: &
        flux_t,    flux_q,     flux_r,    flux_u,  flux_v,    &
        dhdt_surf, dedt_surf,  dedq_surf, drdt_surf,          &
@@ -539,6 +541,7 @@ subroutine surface_flux_0d (                                                 &
   rough_mom(1)   = rough_mom_0
   rough_heat(1)  = rough_heat_0
   rough_moist(1) = rough_moist_0
+  rsl_scale(1)   = rsl_scale_0
   rough_scale(1) = rough_scale_0
   gust(1)        = gust_0
   q_surf(1)      = q_surf_0
@@ -550,7 +553,7 @@ subroutine surface_flux_0d (                                                 &
        t_atm,     q_atm,      u_atm,     v_atm,     p_atm,     z_atm,    &
        p_surf,    t_surf,     t_ca,      q_surf,                         &
        u_surf,    v_surf,                                                &
-       rough_mom, rough_heat, rough_moist, rough_scale, gust,            &
+       rough_mom, rough_heat, rough_moist, rsl_scale, rough_scale, gust, &
        flux_t, flux_q, flux_r, flux_u, flux_v,                           &
        cd_m,      cd_t,       cd_q,                                      &
        w_atm,     u_star,     b_star,     q_star,                        &
@@ -586,7 +589,7 @@ subroutine surface_flux_2d (                                           &
      t_atm,     q_atm_in,   u_atm,     v_atm,     p_atm,     z_atm,    &
      p_surf,    t_surf,     t_ca,      q_surf,                         &
      u_surf,    v_surf,                                                &
-     rough_mom, rough_heat, rough_moist, rough_scale, gust,            &
+     rough_mom, rough_heat, rough_moist, rsl_scale, rough_scale, gust, &
      flux_t,    flux_q,     flux_r,    flux_u,    flux_v,              &
      cd_m,      cd_t,       cd_q,                                      &
      w_atm,     u_star,     b_star,     q_star,                        &
@@ -612,6 +615,7 @@ subroutine surface_flux_2d (                                           &
                                        rough_mom, & !< Momentum roughness length
                                        rough_heat, & !< Heat roughness length
                                        rough_moist, & !< Moisture roughness length
+                                       rsl_scale, & !< Roughness sublayer scale
                                        rough_scale, & !< Scale factor used to topographic roughness calculation
                                        gust !< Gustiness factor
   real, intent(out), dimension(:,:) :: flux_t, & !< Sensible heat flux
@@ -645,7 +649,7 @@ subroutine surface_flux_2d (                                           &
           t_atm(:,j),     q_atm_in(:,j),   u_atm(:,j),     v_atm(:,j),     p_atm(:,j),     z_atm(:,j),    &
           p_surf(:,j),    t_surf(:,j),     t_ca(:,j),      q_surf(:,j),                                   &
           u_surf(:,j),    v_surf(:,j),                                                                    &
-          rough_mom(:,j), rough_heat(:,j), rough_moist(:,j), rough_scale(:,j), gust(:,j),                 &
+          rough_mom(:,j), rough_heat(:,j), rough_moist(:,j), rsl_scale(:,j), rough_scale(:,j), gust(:,j), &
           flux_t(:,j),    flux_q(:,j),     flux_r(:,j),    flux_u(:,j),    flux_v(:,j),                   &
           cd_m(:,j),      cd_t(:,j),       cd_q(:,j),                                                     &
           w_atm(:,j),     u_star(:,j),     b_star(:,j),     q_star(:,j),                                  &
