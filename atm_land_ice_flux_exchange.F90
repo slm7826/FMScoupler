@@ -624,6 +624,7 @@ contains
     allocate( land_ice_atmos_boundary%lhflx(is:ie,js:je) )!miz
 #endif
     allocate( land_ice_atmos_boundary%rough_mom(is:ie,js:je) )
+    allocate( land_ice_atmos_boundary%rsl_scale(is:ie,js:je) )
     allocate( land_ice_atmos_boundary%frac_open_sea(is:ie,js:je) )
     ! initialize boundary values for override experiments (mjh)
     land_ice_atmos_boundary%t=273.0
@@ -1198,7 +1199,7 @@ contains
        is=block_start(l)
        ie=block_end(l)
        call mo_profile ( zrefm, zrefh, ex_z_atm(is:ie), ex_rough_mom(is:ie), &
-            ex_rough_heat(is:ie), ex_rough_moist(is:ie),          &
+            ex_rough_heat(is:ie), ex_rough_moist(is:ie),  ex_rsl_scale(is:ie), &
             ex_u_star(is:ie), ex_b_star(is:ie), ex_q_star(is:ie),        &
             ex_del_m(is:ie), ex_del_h(is:ie), ex_del_q(is:ie), ex_avail(is:ie)  )
        do i = is,ie
@@ -1368,6 +1369,7 @@ contains
     call get_from_xgrid (Land_Ice_Atmos_Boundary%albedo_nir_dif,    'ATM',   &
          ex_albedo_nir_dif   ,  xmap_sfc, complete=.false.)
     call get_from_xgrid (Land_Ice_Atmos_Boundary%rough_mom, 'ATM', ex_rough_mom,  xmap_sfc, complete=.false.)
+    call get_from_xgrid (Land_Ice_Atmos_Boundary%rsl_scale, 'ATM', ex_rsl_scale,  xmap_sfc, complete=.false.)
     call get_from_xgrid (Land_Ice_Atmos_Boundary%land_frac, 'ATM', ex_land_frac,  xmap_sfc, complete=.false.)
 
     call get_from_xgrid (Land_Ice_Atmos_Boundary%u_flux,    'ATM', ex_flux_u,     xmap_sfc, complete=.false.)
@@ -1640,13 +1642,14 @@ contains
     !$OMP                                  ex_rough_mom,ex_rough_heat,ex_rough_moist,ex_u_star,   &
     !$OMP                                  ex_b_star,ex_q_star,ex_del_m,ex_del_h,ex_del_q,        &
     !$OMP                                  ex_tr_ref,n_exch_tr,id_tr_ref,id_tr_ref_land,          &
-    !$OMP                                  ex_avail,ex_ref,ex_tr_surf,ex_tr_atm,isphum)           &
+    !$OMP                                  ex_avail,ex_ref,ex_tr_surf,ex_tr_atm,isphum,           &
+    !$OMP                                  ex_rsl_scale)                                          &
     !$OMP                          private(is,ie)
     do l = 1, my_nblocks
        is=block_start(l)
        ie=block_end(l)
        call mo_profile ( zrefm, zrefh, ex_z_atm(is:ie),   ex_rough_mom(is:ie), &
-            ex_rough_heat(is:ie), ex_rough_moist(is:ie),          &
+            ex_rough_heat(is:ie), ex_rough_moist(is:ie),  ex_rsl_scale(is:ie), &
             ex_u_star(is:ie), ex_b_star(is:ie), ex_q_star(is:ie),        &
             ex_del_m(is:ie), ex_del_h(is:ie), ex_del_q(is:ie), ex_avail(is:ie)  )
 
