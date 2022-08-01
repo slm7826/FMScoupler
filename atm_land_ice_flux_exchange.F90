@@ -146,7 +146,7 @@ module atm_land_ice_flux_exchange_mod
   character(len=4), parameter :: mod_name = 'flux'
 
   integer :: id_drag_moist,  id_drag_heat,  id_drag_mom,     &
-             id_rough_moist, id_rough_heat, id_rough_mom,    &
+             id_rough_moist, id_rough_heat, id_rough_mom, id_rsl,     &
              id_land_mask,   id_ice_mask,     &
              id_u_star, id_b_star, id_q_star, id_u_flux, id_v_flux,   &
              id_t_surf, id_t_flux, id_r_flux, id_q_flux, id_slp,      &
@@ -1559,6 +1559,9 @@ contains
 
     !------- roughness momemtum -----------
     used = send_data ( id_rough_mom, Land_Ice_Atmos_Boundary%rough_mom, Time )
+
+    !------- roughness sublayer scale -----------
+    used = send_data ( id_rsl, Land_Ice_Atmos_Boundary%rsl_scale, Time )
 
     !------- friction velocity -----------
     used = send_data ( id_u_star, Land_Ice_Atmos_Boundary%u_star, Time )
@@ -3288,6 +3291,10 @@ contains
     id_rough_mom  = &
          register_diag_field ( mod_name, 'rough_mom',  atmos_axes, Time, &
          'surface roughness for momentum',  'm'  )
+
+    id_rsl  = &
+         register_diag_field ( mod_name, 'rsl',  atmos_axes, Time, &
+         'roughness sublayer scale',  'm'  )
 
     id_u_star     = &
          register_diag_field ( mod_name, 'u_star',     atmos_axes, Time, &
