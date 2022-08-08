@@ -1726,6 +1726,17 @@ contains
           if(ex_avail(i)) &
                ex_t_ref(i) = ex_t_ca(i) + (ex_t_atm(i)-ex_t_ca(i)) * ex_del_h(i)
        enddo
+       do i = is,ie
+          if(.not.ex_avail(i)) cycle
+          if (175.0<ex_t_ref(i).and.ex_t_ref(i)<373.0) cycle
+
+          write(*,'("t_ref out of bounds :: ",99(a," = ",g14.5,2x))')&
+              't_atm',ex_t_atm(i),'t_ca',ex_t_ca(i),'del_h',ex_del_h(i), &
+              'z0m', ex_rough_mom(i), 'z0h', ex_rough_heat(i), 'zR', ex_rsl_scale(i), &
+              'wind', ex_wind(i), 'u_star', ex_u_star(i), 'flux_t', ex_flux_t(i), &
+              'cd_m', ex_cd_m(i), 'cd_t', ex_cd_t(i)
+       enddo
+
        call compute_qs (ex_t_ref(is:ie), ex_p_surf(is:ie), ex_qs_ref(is:ie), q = ex_ref(is:ie))
        call compute_qs (ex_t_ref(is:ie), ex_p_surf(is:ie), ex_qs_ref_cmip(is:ie),  &
             q = ex_ref(is:ie), es_over_liq_and_ice = .true.)
