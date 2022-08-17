@@ -1716,7 +1716,9 @@ contains
 
     !$OMP parallel do default(none) shared(my_nblocks,block_start,block_end,ex_t_ref,ex_avail, &
     !$OMP                                  ex_t_ca,ex_t_atm,ex_p_surf,ex_qs_ref,ex_del_h,      &
-    !$OMP                                  ex_ref,ex_qs_ref_cmip,ex_ref2 ) &
+    !$OMP                                  ex_ref,ex_qs_ref_cmip,ex_ref2,                      &
+    !$OMP ex_rough_mom, ex_rough_heat, ex_rsl_scale, ex_wind, ex_u_star, ex_b_star, ex_flux_t, &
+    !$OMP ex_cd_m, ex_cd_t                                                                   ) &
     !$OMP                          private(is,ie)
     do l = 1, my_nblocks
        is=block_start(l)
