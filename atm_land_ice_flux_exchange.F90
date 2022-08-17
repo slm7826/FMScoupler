@@ -1731,9 +1731,9 @@ contains
           if (175.0<ex_t_ref(i).and.ex_t_ref(i)<373.0) cycle
 
           write(*,'("t_ref out of bounds :: ",99(a," = ",g14.5,2x))')&
-              't_atm',ex_t_atm(i),'t_ca',ex_t_ca(i),'del_h',ex_del_h(i), &
+              't_ca',ex_t_ca(i), 't_ref',ex_t_ref(i), 't_atm',ex_t_atm(i),'del_h',ex_del_h(i), &
               'z0m', ex_rough_mom(i), 'z0h', ex_rough_heat(i), 'zR', ex_rsl_scale(i), &
-              'wind', ex_wind(i), 'u_star', ex_u_star(i), 'flux_t', ex_flux_t(i), &
+              'wind', ex_wind(i), 'p_surf', ex_p_surf(i), 'u_star', ex_u_star(i), 'b_star', ex_b_star(i), 'flux_t', ex_flux_t(i), &
               'cd_m', ex_cd_m(i), 'cd_t', ex_cd_t(i)
        enddo
 
