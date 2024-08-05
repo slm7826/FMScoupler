@@ -239,16 +239,16 @@ use FMSconstants, only: rdgas, rvgas, cp_air, stefan, WTMAIR, HLV, HLF, Radius, 
   type :: tracer_ind_type
      integer :: atm, ice, lnd !< indices of the tracer in the respective models
   end type tracer_ind_type
-  type(tracer_ind_type), allocatable :: tr_table(:) !< table of tracer indices
+  type(tracer_ind_type), allocatable :: tr_table(:) !< table of tracers passed through flux exchange
   type :: tracer_exch_ind_type
      integer :: exch = 0  !< exchange grid index
      integer :: ice = 0   !< ice model index
      integer :: lnd = 0   !< land model index
   end type tracer_exch_ind_type
   type(tracer_exch_ind_type), allocatable :: tr_table_map(:) !< map atm tracers to exchange, ice and land variables
-  integer :: isphum = NO_TRACER       !< index of specific humidity tracer in tracer table
-  integer :: ico2   = NO_TRACER       !< index of co2 tracer in tracer table
-  integer :: inh3   = NO_TRACER       !< index of nh3 tracer in tracer table
+  integer :: isphum = NO_TRACER       !< index of specific humidity tracer in the array of tracers passed through flux exchange (tr_table)
+  integer :: ico2   = NO_TRACER       !< index of co2 tracer in the array of tracers passed through flux exchange (tr_table)
+  integer :: inh3   = NO_TRACER       !< index of nh3 tracer in the array of tracers passed through flux exchange (tr_table)
   type(FmsCoupler1dBC_type), pointer :: ex_gas_fields_atm=>NULL() !< gas fields in atm
                                                                  !< Place holder for various atmospheric fields.
   type(FmsCoupler1dBC_type), pointer :: ex_gas_fields_ice=>NULL() ! gas fields on ice
