@@ -3818,9 +3818,9 @@ contains
     do tr = 1, n_exch_tr
        call fms_tracer_manager_get_tracer_names( MODEL_ATMOS, tr_table(tr)%atm, name, longname, units )
 
-       id_tr_con_atm(tr) = register_tiled_diag_field( mod_name, trim(name)//'_tot_con_atm', atmos_axes, Time, &
+       id_tr_con_atm(tr) = fms_diag_register_diag_field( mod_name, trim(name)//'_tot_con_atm', atmos_axes, Time, &
             'vd of '//trim(longname), 'm/s', missing_value=-1.0 )
-       id_tr_con_ref(tr) = register_tiled_diag_field( mod_name, trim(name)//'_tot_con_ref', atmos_axes, Time, &
+       id_tr_con_ref(tr) = fms_diag_register_diag_field( mod_name, trim(name)//'_tot_con_ref', atmos_axes, Time, &
             'vd of '//trim(longname)//' at '//trim(label_zh), 'm/s', missing_value=-1.0 )
 
        id_tr_atm(tr) = fms_diag_register_diag_field (mod_name, trim(name)//'_atm', atmos_axes, Time, &
