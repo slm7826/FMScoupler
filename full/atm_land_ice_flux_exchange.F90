@@ -3725,6 +3725,7 @@ contains
        allocate(id_tr_mol_flux_land(n_exch_tr))
        allocate(id_tr_con_atm_land(n_exch_tr))
        allocate(id_tr_con_ref_land(n_exch_tr))
+       allocate(id_tr_ref_land(n_exch_tr))
 
        do tr = 1, n_exch_tr
           call fms_tracer_manager_get_tracer_names( MODEL_ATMOS, tr_table(tr)%atm, name, longname, units )
@@ -3743,6 +3744,13 @@ contains
              id_tr_mol_flux_land(tr) = register_tiled_diag_field( 'flux_land', trim(name)//'_mol_flux', Land_axes, Time, &
                   'flux of '//trim(longname), 'mol/(m2 s)', missing_value=-1.0 )
           endif
+          ! we skip sphum because it is already available as flux_land/q_ref
+          if ( tr .ne. isphum ) then
+             id_tr_ref_land(tr) = register_tiled_diag_field( 'flux_land', trim(name)//'_ref', Land_axes, Time, &
+                  trim(longname)//' at '//trim(label_zh)//' over land', trim(units),missing_value=-1.0)
+          else
+             id_tr_ref_land(tr) = -1
+          end if
        enddo
 #else
        id_t_ref_land = &
@@ -3813,7 +3821,6 @@ contains
     allocate(id_tr_con_atm(n_exch_tr))
     allocate(id_tr_con_ref(n_exch_tr))
     allocate(id_tr_ref(n_exch_tr))
-    allocate(id_tr_ref_land(n_exch_tr))
 
     do tr = 1, n_exch_tr
        call fms_tracer_manager_get_tracer_names( MODEL_ATMOS, tr_table(tr)%atm, name, longname, units )
@@ -3832,11 +3839,8 @@ contains
        if ( tr .ne. isphum ) then
           id_tr_ref(tr) = fms_diag_register_diag_field (mod_name, trim(name)//'_ref',  atmos_axes, Time, &
                trim(longname)//' at '//trim(label_zh), trim(units),missing_value=-1.0)
-          id_tr_ref_land(tr) = fms_diag_register_diag_field ('flux_land', trim(name)//'_ref_land', land_axes, Time, &
-               trim(longname)//' at '//trim(label_zh)//' over land', trim(units),missing_value=-1.0)
        else
           id_tr_ref(tr) = -1
-          id_tr_ref_land(tr) = -1
        end if
        !! add dryvmr co2_surf and co2_atm
        if ( fms_mpp_lowercase(trim(name))=='co2') then
